@@ -1,0 +1,979 @@
+//@version=5
+indicator("AEWO — Adaptive Elliott Wave Oscillator v3 (Overlay)", shorttitle="AEWO Waves", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=200)
+
+// ═════════════════════════════════════════════════════════════════════
+// UDT & Helper Functions for Progressive Elliott Wave Engine
+// ═════════════════════════════════════════════════════════════════════
+type WaveSequence
+    int confirmedLegs = 0
+    bool failed = false
+    int failWave = 0
+    float p0 = na
+    float p1 = na
+    float p2 = na
+    float p3 = na
+    float p4 = na
+    float p5 = na
+    int b0 = 0
+    int b1 = 0
+    int b2 = 0
+    int b3 = 0
+    int b4 = 0
+    int b5 = 0
+    bool isBull = false
+
+f_trace_sequence(float[] pa, int[] ba, bool[] ia, float[] ea, int i) =>
+    int sz = array.size(pa)
+    WaveSequence seq = WaveSequence.new()
+    
+    if sz > i + 1
+        seq.b0 := array.get(ba, i)
+        seq.p0 := array.get(pa, i)
+        seq.isBull := array.get(ia, i)
+        
+        seq.confirmedLegs := 1
+        seq.b1 := array.get(ba, i+1)
+        seq.p1 := array.get(pa, i+1)
+        
+        float W1 = math.abs(seq.p1 - seq.p0)
+        
+        // Wave 2
+        if sz > i + 2
+            seq.b2 := array.get(ba, i+2)
+            seq.p2 := array.get(pa, i+2)
+            bool w2_ok = seq.isBull ? (seq.p2 > seq.p0) : (seq.p2 < seq.p0)
+            if w2_ok
+                seq.confirmedLegs := 2
+            else
+                seq.failed := true
+                seq.failWave := 2
+        else
+            // Wave 2 is forming. Check for live/historical breach of Wave 1 origin (p0)
+            int lookback = bar_index - seq.b1
+            if lookback > 0
+                float extreme = seq.isBull ? ta.lowest(low, lookback) : ta.highest(high, lookback)
+                bool fail = seq.isBull ? (extreme < seq.p0) : (extreme > seq.p0)
+                if fail
+                    seq.failed := true
+                    seq.failWave := 2
+                    seq.b2 := bar_index
+                    seq.p2 := extreme
+                    
+        // Wave 3
+        if not seq.failed
+            if sz > i + 3
+                seq.b3 := array.get(ba, i+3)
+                seq.p3 := array.get(pa, i+3)
+                float W3 = math.abs(seq.p3 - seq.p2)
+                
+                // Check Wave 3 peak EWO gate logic
+                float ew3 = array.get(ea, i+3)
+                float ceh = na
+                float cel = na
+                for k = i to i+3
+                    float ev = array.get(ea, k)
+                    ceh := na(ceh) ? ev : math.max(ceh, ev)
+                    cel := na(cel) ? ev : math.min(cel, ev)
+                bool ewo_ok = seq.isBull ? (not na(ew3) and not na(ceh) and ew3 >= ceh * 0.90)
+                                         : (not na(ew3) and not na(cel) and ew3 <= cel * 0.90)
+                
+                bool w3_ok = seq.isBull ? (seq.p3 > seq.p1 and W3 >= W1) : (seq.p3 < seq.p1 and W3 >= W1)
+                if w3_ok and ewo_ok
+                    seq.confirmedLegs := 3
+                else
+                    seq.failed := true
+                    seq.failWave := 3
+            else if sz > i + 2
+                // Wave 3 is forming. Check for breach of Wave 2 low (p2)
+                int lookback = bar_index - seq.b2
+                if lookback > 0
+                    float extreme = seq.isBull ? ta.lowest(low, lookback) : ta.highest(high, lookback)
+                    bool fail = seq.isBull ? (extreme < seq.p2) : (extreme > seq.p2)
+                    if fail
+                        seq.failed := true
+                        seq.failWave := 3
+                        seq.b3 := bar_index
+                        seq.p3 := extreme
+                        
+        // Wave 4
+        if not seq.failed
+            if sz > i + 4
+                seq.b4 := array.get(ba, i+4)
+                seq.p4 := array.get(pa, i+4)
+                bool w4_ok = seq.isBull ? (seq.p4 > seq.p1) : (seq.p4 < seq.p1)
+                if w4_ok
+                    seq.confirmedLegs := 4
+                else
+                    seq.failed := true
+                    seq.failWave := 4
+            else if sz > i + 3
+                // Wave 4 is forming. Check for overlap of Wave 1 (p1)
+                int lookback = bar_index - seq.b3
+                if lookback > 0
+                    float extreme = seq.isBull ? ta.lowest(low, lookback) : ta.highest(high, lookback)
+                    bool fail = seq.isBull ? (extreme <= seq.p1) : (extreme >= seq.p1)
+                    if fail
+                        seq.failed := true
+                        seq.failWave := 4
+                        seq.b4 := bar_index
+                        seq.p4 := extreme
+                        
+        // Wave 5
+        if not seq.failed
+            if sz > i + 5
+                seq.b5 := array.get(ba, i+5)
+                seq.p5 := array.get(pa, i+5)
+                float W5 = math.abs(seq.p5 - seq.p4)
+                float W3 = math.abs(seq.p3 - seq.p2)
+                bool w5_ok = seq.isBull ? (seq.p5 > seq.p3 and W3 >= math.min(W1, W5)) : (seq.p5 < seq.p3 and W3 >= math.min(W1, W5))
+                if w5_ok
+                    seq.confirmedLegs := 5
+                else
+                    seq.failed := true
+                    seq.failWave := 5
+            else if sz > i + 4
+                // Wave 5 is forming. Check for breach of Wave 4 (p4) or origin (p0)
+                int lookback = bar_index - seq.b4
+                if lookback > 0
+                    float extreme = seq.isBull ? ta.lowest(low, lookback) : ta.highest(high, lookback)
+                    bool fail = seq.isBull ? (extreme < seq.p4 or extreme < seq.p0) : (extreme > seq.p4 or extreme > seq.p0)
+                    if fail
+                        seq.failed := true
+                        seq.failWave := 5
+                        seq.b5 := bar_index
+                        seq.p5 := extreme
+                        
+    seq
+
+// ═════════════════════════════════════════════════════════════════════
+// Stage 1 — Inputs
+// ═════════════════════════════════════════════════════════════════════
+src            = input.source(close, "Source")
+len_atr        = input.int(14,  "ATR Length",                  minval=1)
+len_vol        = input.int(20,  "Volume MA Length",             minval=1)
+delay_fast     = input.int(3,   "Signal Delay Fast (High Vol)", minval=1)
+delay_slow     = input.int(5,   "Signal Delay Slow (Low Vol)",  minval=1)
+piv_left       = input.int(8,   "Pivot Lookback Fine (Left)",   minval=1)
+coarse_mul     = input.int(3,   "Coarse Pivot Multiplier",      minval=2, maxval=6,
+                 tooltip="Coarse lookback = Fine x this value. Catches larger-degree waves.")
+max_anchor_age = input.int(300, "Max Anchor Age (bars)",        minval=50,
+                 tooltip="Pivots older than this are pruned from the scan window.")
+
+show_fib          = input.bool(true,  "Show Fibonacci Levels")
+show_wave         = input.bool(true,  "Show Wave Lines + Labels")
+show_partial      = input.bool(true,  "Show partial/forming waves (dotted)")
+show_forming      = input.bool(true,  "Dotted line: last pivot to current price")
+show_abc          = input.bool(true,  "Show ABC correction (after 6 pivots)")
+abc_mode          = input.string("LuxAlgo", "ABC Detection Mode",
+                     options=["AEWO", "LuxAlgo", "Both"],
+                     tooltip="LuxAlgo = Lux 85.4% depth (recommended). AEWO adds zigzag shape + B retrace of A.")
+abc_fib_854       = input.float(0.854, "ABC Lux Depth (of W0–W5 range)", minval=0.5, maxval=1.0, step=0.01)
+abc_c_min         = input.float(0.618, "ABC min C/B (AEWO mode only)", minval=0.382, maxval=1.618, step=0.01)
+show_abc_sig      = input.bool(true,  "Show ABC entry label on confirm")
+show_abc_forming  = input.bool(true,  "Show ABC? while C leg forming")
+show_sig          = input.bool(true,  "Show Signal Labels")
+t1_once_per_setup = input.bool(true,  "T1: one label per setup (less clutter)")
+entry_tier        = input.string("T2","Entry Tier", options=["T1","T2","T3"])
+show_forming_motive = input.bool(true,  "Show Forming Motive Waves")
+show_failed_motive  = input.bool(true,  "Show Failed Motive Waves")
+show_partial_labels = input.bool(true,  "Show Partial Wave Labels")
+
+// ═════════════════════════════════════════════════════════════════════
+// Stage 2 — Adaptive EWO  (Calculation Only)
+// ═════════════════════════════════════════════════════════════════════
+ewo     = ta.ema(src, 5) - ta.ema(src, 34)
+atrNow  = ta.atr(len_atr)
+atrAvg  = ta.sma(atrNow, 50)
+fastMkt = atrNow > atrAvg * 1.3
+
+ewoSigFast = ta.ema(ewo, delay_fast)
+ewoSigSlow = ta.ema(ewo, delay_slow)
+ewoSig     = fastMkt ? ewoSigFast : ewoSigSlow
+
+ewoLo100 = ta.lowest(ewo, 100)
+threshLo = ewoLo100 * 0.20
+
+ewoNewCycleHigh = ewo > ta.highest(ewo[1], 50)
+ewoCol = ewo >= 0
+     ? (ewoNewCycleHigh ? color.new(color.lime, 0) : color.new(color.green, 15))
+     : (ewo < threshLo  ? color.new(color.red,  0) : color.new(color.maroon, 15))
+
+// ═════════════════════════════════════════════════════════════════════
+// Stage 3 — Dual pivot arrays
+// ═════════════════════════════════════════════════════════════════════
+piv_coarse = piv_left * coarse_mul
+
+phF = ta.pivothigh(high, piv_left,   1)
+plF = ta.pivotlow (low,  piv_left,   1)
+phC = ta.pivothigh(high, piv_coarse, 1)
+plC = ta.pivotlow (low,  piv_coarse, 1)
+
+var float[] fPrice = array.new_float()
+var int[]   fBar   = array.new_int()
+var bool[]  fIsLow = array.new_bool()
+var float[] fEwo   = array.new_float()
+
+var float[] cPrice = array.new_float()
+var int[]   cBar   = array.new_int()
+var bool[]  cIsLow = array.new_bool()
+var float[] cEwo   = array.new_float()
+
+f_push(float[] pa, int[] ba, bool[] ia, float[] ea,
+       float _price, int _bar, bool _isLow, float _ewoVal) =>
+    int  n        = array.size(pa)
+    bool appended = false
+    if n == 0
+        array.push(pa, _price)
+        array.push(ba, _bar)
+        array.push(ia, _isLow)
+        array.push(ea, _ewoVal)
+        appended := true
+    else
+        bool  lastLow = array.get(ia, n - 1)
+        float lastP   = array.get(pa, n - 1)
+        int   lastB   = array.get(ba, n - 1)
+        if _isLow == lastLow
+            bool replace = _isLow ? (_price < lastP) : (_price > lastP)
+            if replace
+                array.set(pa, n - 1, _price)
+                array.set(ba, n - 1, _bar)
+                array.set(ea, n - 1, _ewoVal)
+        else
+            if _bar != lastB
+                array.push(pa, _price)
+                array.push(ba, _bar)
+                array.push(ia, _isLow)
+                array.push(ea, _ewoVal)
+                appended := true
+    appended
+
+if not na(plF)
+    f_push(fPrice, fBar, fIsLow, fEwo, plF, bar_index - 1, true,  ewo[1])
+if not na(phF)
+    f_push(fPrice, fBar, fIsLow, fEwo, phF, bar_index - 1, false, ewo[1])
+if not na(plC)
+    f_push(cPrice, cBar, cIsLow, cEwo, plC, bar_index - 1, true,  ewo[1])
+if not na(phC)
+    f_push(cPrice, cBar, cIsLow, cEwo, phC, bar_index - 1, false, ewo[1])
+
+f_prune(float[] pa, int[] ba, bool[] ia, float[] ea) =>
+    int  cutoff = bar_index - max_anchor_age
+    bool go     = true
+    while go and array.size(pa) > 0
+        if array.get(ba, 0) < cutoff
+            array.shift(pa)
+            array.shift(ba)
+            array.shift(ia)
+            array.shift(ea)
+        else
+            go := false
+
+if barstate.isconfirmed
+    f_prune(fPrice, fBar, fIsLow, fEwo)
+    f_prune(cPrice, cBar, cIsLow, cEwo)
+
+// ═════════════════════════════════════════════════════════════════════
+// Stage 4 — Multi-anchor gate scan
+// ═════════════════════════════════════════════════════════════════════
+f_eval(float p0, float p1, float p2, float p3, float p4, float p5,
+       bool isLow0, float ewoW3, float ceHigh, float ceLow) =>
+    float W1 = math.abs(p1 - p0)
+    float W3 = math.abs(p3 - p2)
+    float W5 = math.abs(p5 - p4)
+    bool  bull = isLow0     and (p0 < p1 and p2 < p1 and p2 > p0)
+    bool  bear = not isLow0 and (p0 > p1 and p2 > p1 and p2 < p0)
+
+    float W2ret = na
+    float W3ext = na
+    if W1 > 0
+        W2ret := bull ? ((p1 - p2) / W1) : bear ? ((p2 - p1) / W1) : na
+        W3ext := W3 / W1
+
+    bool G1 = W3 != math.min(W1, math.min(W3, W5))
+    bool G2 = bull ? (p5 > p3 and p3 > p1) : bear ? (p5 < p3 and p3 < p1) : false
+    bool G3 = bull ? (p4 > p1)              : bear ? (p4 < p1)             : false
+    bool G4 = not na(W2ret) and (W2ret >= 0.382 and W2ret <= 0.786)
+    bool G5 = not na(W3ext) and (W3ext >= 1.0)
+    bool G6 = bull ? (not na(ewoW3) and not na(ceHigh) and ewoW3 >= ceHigh * 0.90)
+                   : bear ? (not na(ewoW3) and not na(ceLow)  and ewoW3 <= ceLow  * 0.90)
+                   : false
+
+    bool  valid = (bull or bear) and G1 and G2 and G3 and G4 and G5 and G6
+    int   gc    = (G1?1:0) + (G2?1:0) + (G3?1:0) + (G4?1:0) + (G5?1:0) + (G6?1:0)
+    float w3b   = not na(W3ext) ? math.min(W3ext, 2.0) : 0.0
+    float g6q   = bull and not na(ewoW3) and not na(ceHigh) and ceHigh != 0
+                  ? math.min(math.abs(ewoW3 / ceHigh), 1.0) : 0.0
+    float score = gc + w3b + g6q
+    [valid, bull, score,
+     not na(W3ext) ? W3ext : 0.0,
+     not na(W2ret) ? W2ret : 0.0]
+
+f_scan(float[] pa, int[] ba, bool[] ia, float[] ea) =>
+    int sz = array.size(pa)
+
+    bool  found   = false
+    bool  bBull   = false
+    int   bIdx    = -1
+    float bSc     = -1.0
+    float bW3e    = 0.0
+    float bW2r    = 0.0
+    float bp0 = na
+    float bp1 = na
+    float bp2 = na
+    float bp3 = na
+    float bp4 = na
+    float bp5 = na
+
+    int bb0 = 0
+    int bb1 = 0
+    int bb2 = 0
+    int bb3 = 0
+    int bb4 = 0
+    int bb5 = 0
+
+    if sz >= 6
+        for i = 0 to sz - 6
+            float p0  = array.get(pa, i)
+            float p1  = array.get(pa, i+1)
+            float p2  = array.get(pa, i+2)
+            float p3  = array.get(pa, i+3)
+            float p4  = array.get(pa, i+4)
+            float p5  = array.get(pa, i+5)
+            bool  lo  = array.get(ia, i)
+            float ew3 = array.get(ea, i+3)
+
+            float ceh = na
+            float cel = na
+            for k = i to i + 5
+                float ev = array.get(ea, k)
+                ceh := na(ceh) ? ev : math.max(ceh, ev)
+                cel := na(cel) ? ev : math.min(cel, ev)
+
+            [v, bull, sc, w3e, w2r] = f_eval(p0,p1,p2,p3,p4,p5, lo, ew3, ceh, cel)
+
+            if v and sc > bSc
+                found  := true
+                bBull  := bull
+                bIdx   := i
+                bSc    := sc
+                bW3e   := w3e
+                bW2r   := w2r
+                bp0:=p0
+                bp1:=p1 
+                bp2:=p2
+                bp3:=p3 
+                bp4:=p4 
+                bp5:=p5
+                bb0:=array.get(ba,i)   
+                bb1:=array.get(ba,i+1)
+                bb2:=array.get(ba,i+2) 
+                bb3:=array.get(ba,i+3)
+                bb4:=array.get(ba,i+4) 
+                bb5:=array.get(ba,i+5)
+
+    [found, bBull, bIdx, bSc, bW3e, bW2r,
+     bp0,bp1,bp2,bp3,bp4,bp5,
+     bb0,bb1,bb2,bb3,bb4,bb5]
+
+[fFound,fBull,fIdx,fSc,fW3e,fW2r, fP0,fP1,fP2,fP3,fP4,fP5, fB0,fB1,fB2,fB3,fB4,fB5] =
+     f_scan(fPrice, fBar, fIsLow, fEwo)
+
+[cFound,cBull,cIdx,cSc,cW3e,cW2r, cP0,cP1,cP2,cP3,cP4,cP5, cB0,cB1,cB2,cB3,cB4,cB5] =
+     f_scan(cPrice, cBar, cIsLow, cEwo)
+
+bool  useCoarse  = cFound and (not fFound or cSc >= fSc + 0.5)
+bool  isValidWave = useCoarse ? cFound : fFound
+bool  isBullWave  = useCoarse ? cBull  : fBull
+float bestP0 = useCoarse ? cP0 : fP0
+float bestP1 = useCoarse ? cP1 : fP1
+float bestP2 = useCoarse ? cP2 : fP2
+float bestP3 = useCoarse ? cP3 : fP3
+float bestP4 = useCoarse ? cP4 : fP4
+float bestP5 = useCoarse ? cP5 : fP5
+int   bestB0 = useCoarse ? cB0 : fB0
+int   bestB1 = useCoarse ? cB1 : fB1
+int   bestB2 = useCoarse ? cB2 : fB2
+int   bestB3 = useCoarse ? cB3 : fB3
+int   bestB4 = useCoarse ? cB4 : fB4
+int   bestB5 = useCoarse ? cB5 : fB5
+int   bestIdx = useCoarse ? cIdx : fIdx
+
+float[] activeArr = useCoarse ? cPrice : fPrice
+int[]   activeBar = useCoarse ? cBar   : fBar
+bool[]  activeIsLow = useCoarse ? cIsLow : fIsLow
+float[] activeEwo = useCoarse ? cEwo : fEwo
+
+bool structuralBreak = false
+if isValidWave and barstate.isconfirmed
+    structuralBreak := isBullWave ? (close < bestP0 * 0.999)
+                                  : (close > bestP0 * 1.001)
+
+// ═════════════════════════════════════════════════════════════════════
+// Stage 4b — ABC correction
+// ═════════════════════════════════════════════════════════════════════
+f_abc_eval(bool bullMotive, float p0, float p5, float p6, float p7, float p8,
+           float fib854, float cMin, string mode) =>
+    float legA = math.abs(p6 - p5)
+    float legB = math.abs(p7 - p6)
+    float legC = math.abs(p8 - p7)
+    float diff = math.abs(p5 - p0)
+    bool  shp  = false
+    if bullMotive
+        shp := p6 < p5 and p7 < p5 and p8 < p7
+    else
+        shp := p6 > p5 and p7 > p5 and p8 > p7
+    float bRet = legA > 0 ? legB / legA : na
+    float cVsB = legB > 0 ? legC / legB : na
+    bool aewoOk = shp and not na(bRet) and bRet >= 0.382 and bRet <= 0.786
+                    and not na(cVsB) and cVsB >= cMin
+    bool luxOk = false
+    if bullMotive
+        luxOk := p7 < p5 and p6 > p5 - diff * fib854 and p8 > p5 - diff * fib854
+    else
+        luxOk := p7 > p5 and p6 < p5 + diff * fib854 and p8 < p5 + diff * fib854
+    bool valid = false
+    if mode == "AEWO"
+        valid := aewoOk
+    else if mode == "LuxAlgo"
+        valid := luxOk
+    else
+        valid := aewoOk and luxOk
+    [valid, aewoOk, luxOk]
+
+var int   abcMotIdx     = -1
+var bool  abcMotBull    = na
+var bool  abcMotCoarse  = false
+var int   abcMotB0      = -1
+var float abcMotP0      = na
+var float abcMotP5      = na
+var bool  abcConfirmed  = false
+var bool  abcSigFired   = false
+
+bool isValidABC  = false
+bool abcForming  = false
+int  abcFormLegs = 0
+
+if structuralBreak
+    abcMotIdx     := -1
+    abcMotB0      := -1
+    abcMotP0      := na
+    abcMotP5      := na
+    abcConfirmed  := false
+    abcSigFired   := false
+
+if barstate.isconfirmed and isValidWave and not structuralBreak and not abcConfirmed
+    bool w5Set = false
+    if useCoarse
+        w5Set := cB5 < bar_index
+    else
+        w5Set := fB5 < bar_index
+    if w5Set
+        bool reFreeze = false
+        if abcMotIdx == -1
+            reFreeze := true
+        else if bestB0 != abcMotB0
+            reFreeze := true
+        if reFreeze
+            abcMotIdx    := bestIdx
+            abcMotBull   := isBullWave
+            abcMotCoarse := useCoarse
+            abcMotB0     := bestB0
+            abcMotP0     := bestP0
+            abcMotP5     := bestP5
+
+if abcMotIdx >= 0 and not abcConfirmed
+    float[] abcArr  = abcMotCoarse ? cPrice : fPrice
+    int szA = array.size(abcArr)
+    if szA >= abcMotIdx + 9
+        float p5w = array.get(abcArr, abcMotIdx + 5)
+        float p6  = array.get(abcArr, abcMotIdx + 6)
+        float p7  = array.get(abcArr, abcMotIdx + 7)
+        float p8  = array.get(abcArr, abcMotIdx + 8)
+        [vABC, aOk, lOk] = f_abc_eval(abcMotBull, abcMotP0, p5w, p6, p7, p8,
+                         abc_fib_854, abc_c_min, abc_mode)
+        isValidABC := vABC
+        if vABC
+            abcConfirmed := true
+    else if szA >= abcMotIdx + 8
+        abcFormLegs := 2
+        abcForming  := show_abc_forming
+    else if szA >= abcMotIdx + 7
+        abcFormLegs := 1
+        abcForming  := show_abc_forming
+    else if szA >= abcMotIdx + 6
+        abcFormLegs := 0
+        abcForming  := show_abc_forming
+
+// New motive anchor after ABC done — allow next correction cycle
+if barstate.isconfirmed and abcConfirmed and isValidWave
+    if bestB0 != abcMotB0
+        abcMotIdx     := -1
+        abcMotB0      := -1
+        abcMotP0      := na
+        abcMotP5      := na
+        abcConfirmed  := false
+        abcSigFired   := false
+
+bool abcConfirmLbl = false
+if abcConfirmed and not abcSigFired and barstate.isconfirmed
+    abcConfirmLbl := true
+    abcSigFired   := true
+
+// ═════════════════════════════════════════════════════════════════════
+// Stage 5 — Signals
+// ═════════════════════════════════════════════════════════════════════
+volOk      = volume > ta.sma(volume, len_vol)
+ewoRising2 = ewo > ewo[1] and ewo[1] > ewo[2]
+ewoFall2   = ewo < ewo[1] and ewo[1] < ewo[2]
+gap        = ewoSig - ewo
+gapShrink2 = gap < gap[1] and gap[1] < gap[2]
+gapGrow2   = gap > gap[1] and gap[1] > gap[2]
+
+tier1Long  = ewo < 0 and ewoRising2 and gapShrink2
+tier1Short = ewo > 0 and ewoFall2   and gapGrow2
+tier1LongLbl  = t1_once_per_setup ? (tier1Long  and not tier1Long[1])  : tier1Long
+tier1ShortLbl = t1_once_per_setup ? (tier1Short and not tier1Short[1]) : tier1Short
+
+crossUp   = ta.crossover (ewo, ewoSig)
+crossDown = ta.crossunder(ewo, ewoSig)
+tier2Long  = crossUp   and volOk and isValidWave and not structuralBreak
+tier2Short = crossDown and volOk and isValidWave and not structuralBreak
+
+priceBreakLong  = isValidWave ? close > bestP1 : false
+priceBreakShort = isValidWave ? close < bestP1 : false
+ewoNewPeakLong  = ewo > ta.highest(ewo[1], 50)
+ewoNewPeakShort = ewo < ta.lowest (ewo[1], 50)
+tier3Long  = tier2Long  and priceBreakLong  and ewoNewPeakLong
+tier3Short = tier2Short and priceBreakShort and ewoNewPeakShort
+
+w5WarnLong  = tier2Long  and not tier3Long  and ewo > 0 and not ewoNewPeakLong
+w5WarnShort = tier2Short and not tier3Short and ewo < 0 and not ewoNewPeakShort
+
+var float posPct = 0.0
+if tier3Long or tier3Short
+    posPct := 1.0
+else if tier2Long or tier2Short
+    posPct := 0.5
+else if tier1Long or tier1Short
+    posPct := 0.25
+else
+    posPct := 0.0
+if w5WarnLong or w5WarnShort
+    posPct := math.min(posPct, 0.5)
+
+alertcondition(tier1Long,  "AEWO T1 Long",  "AEWO T1 pre-signal long")
+alertcondition(tier2Long,  "AEWO T2 Long",  "AEWO T2 crossover long")
+alertcondition(tier3Long,  "AEWO T3 Long",  "AEWO T3 full confirm long")
+alertcondition(tier1Short, "AEWO T1 Short", "AEWO T1 pre-signal short")
+alertcondition(tier2Short, "AEWO T2 Short", "AEWO T2 crossover short")
+alertcondition(tier3Short, "AEWO T3 Short", "AEWO T3 full confirm short")
+alertcondition(abcConfirmed and not abcConfirmed[1], "AEWO ABC Found", "AEWO ABC corrective pattern confirmed")
+
+// ═════════════════════════════════════════════════════════════════════
+// Stage 6 — Fibonacci levels (live only — always on current best wave)
+// ═════════════════════════════════════════════════════════════════════
+var line fibL2   = na
+var line fibL3   = na
+var line fibTP2  = na
+var line fibStop = na
+var box  fibBox  = na
+
+if barstate.islast
+    if not na(fibL2)
+        line.delete(fibL2)
+    if not na(fibL3)
+        line.delete(fibL3)
+    if not na(fibTP2)
+        line.delete(fibTP2)
+    if not na(fibStop)
+        line.delete(fibStop)
+    if not na(fibBox)
+        box.delete(fibBox)
+    fibL2 := na 
+    fibL3 := na 
+    fibTP2 := na 
+    fibStop := na 
+    fibBox := na
+
+    if show_fib and isValidWave and not structuralBreak
+        float w1rng  = math.abs(bestP1 - bestP0)
+        float w2_618 = isBullWave ? (bestP1 - w1rng * 0.618) : (bestP1 + w1rng * 0.618)
+        float w2_786 = isBullWave ? (bestP1 - w1rng * 0.786) : (bestP1 + w1rng * 0.786)
+        float tp2    = isBullWave ? (bestP2 + w1rng * 1.618) : (bestP2 - w1rng * 1.618)
+        float stop   = isBullWave ? (bestP0 * 0.998)         : (bestP0 * 1.002)
+        int   x1     = bar_index - 50
+        int   x2     = bar_index
+        fibL2   := line.new(x1, w2_618, x2, w2_618,
+                     color=color.new(color.orange,0), style=line.style_solid)
+        fibL3   := line.new(x1, w2_786, x2, w2_786,
+                     color=color.new(color.red,0),    style=line.style_solid)
+        fibTP2  := line.new(x1, tp2,    x2, tp2,
+                     color=color.new(color.lime,0),   style=line.style_dashed, width=2)
+        fibStop := line.new(x1, stop,   x2, stop,
+                     color=color.new(color.red,0),    style=line.style_dotted)
+        fibBox  := box.new(x1, math.max(w2_618,w2_786), x2, math.min(w2_618,w2_786),
+                     bgcolor=color.new(color.orange,88),
+                     border_color=color.new(color.orange,70))
+
+// ═════════════════════════════════════════════════════════════════════
+// Stage 7 — Wave drawing  (v3 fixed - upgraded to Progressive & Failed Wave Engine)
+// ═════════════════════════════════════════════════════════════════════
+
+var line[]  histLines    = array.new<line>()
+var label[] histLabels   = array.new<label>()
+var line[]  liveLines    = array.new<line>()
+var label[] liveLabels   = array.new<label>()
+var line    formingLine  = na
+var label   formingLabel = na
+
+var int   lastAnchorB0     = -1
+var bool  lastAnchorBull   = na
+var bool  lastAnchorCoarse = na
+var int   histSegCount     = 0
+var int   abcDrawnAtB0     = -1
+var int   lastDrawnAnchorB0 = -1
+var label statusLabel      = na
+
+var float lastConfirmedClose = na
+if barstate.isconfirmed
+    lastConfirmedClose := close
+
+f_lbl(int n) =>
+    string txt = ""
+    if n == 6
+        txt := "(a)"
+    else if n == 7
+        txt := "(b)"
+    else if n == 8
+        txt := "(c)"
+    else if n == 3
+        txt := "*(3)"
+    else
+        txt := "(" + str.tostring(n) + ")"
+    txt
+
+// Helper to update status label on chart
+f_update_status_label(string txt) =>
+    if not na(statusLabel)
+        label.delete(statusLabel)
+    
+    // Position it 1.5 ATRs above the current high to keep it clean and visible
+    float labelY = high + ta.atr(14) * 1.5
+    statusLabel := label.new(bar_index, labelY, txt, 
+                             xloc=xloc.bar_index, 
+                             style=label.style_label_center, 
+                             textcolor=color.white, 
+                             color=color.new(color.blue, 20), 
+                             size=size.normal)
+
+// ── 7A: Historical drawing (confirmed bars only) ──────────────────
+if show_wave and barstate.isconfirmed
+    // Reset drawn count on structural break
+    if structuralBreak
+        lastDrawnAnchorB0 := -1
+        abcDrawnAtB0      := -1
+        abcSigFired       := false
+        abcMotIdx         := -1
+        abcMotB0          := -1
+        abcMotP0          := na
+        abcMotP5          := na
+        abcConfirmed      := false
+
+    // We scan the active pivot array
+    int i = 0
+    int sz = array.size(activeArr)
+    while i < sz - 1
+        if sz - i < 2
+            break
+            
+        WaveSequence seq = f_trace_sequence(activeArr, activeBar, activeIsLow, activeEwo, i)
+        bool isFinished = seq.confirmedLegs == 5 or seq.failed
+        int lastPivotBar = seq.failed ? (seq.failWave == 2 ? seq.b2 : seq.failWave == 3 ? seq.b3 : seq.failWave == 4 ? seq.b4 : seq.b5) : seq.b5
+        
+        if isFinished and lastPivotBar < bar_index
+            // If this is a newly completed or failed sequence we haven't drawn yet
+            if seq.b0 > lastDrawnAnchorB0
+                int drawLegs = seq.failed ? (seq.failWave - 1) : 5
+                float[] pVals = array.from(seq.p0, seq.p1, seq.p2, seq.p3, seq.p4, seq.p5)
+                int[]   bVals = array.from(seq.b0, seq.b1, seq.b2, seq.b3, seq.b4, seq.b5)
+                
+                // Draw confirmed segments
+                if drawLegs > 0
+                    for seg = 0 to drawLegs - 1
+                        float px1 = array.get(pVals, seg)
+                        float px2 = array.get(pVals, seg+1)
+                        int   bx1 = array.get(bVals, seg)
+                        int   bx2 = array.get(bVals, seg+1)
+                        int   legN = seg + 1
+                        
+                        color segCol = seq.isBull ? color.blue : color.red
+                        line ln = line.new(bx1, px1, bx2, px2, xloc=xloc.bar_index, extend=extend.none, color=segCol, style=line.style_solid, width=2)
+                        array.push(histLines, ln)
+                        
+                        if show_partial_labels or legN == 5
+                            string ltxt = f_lbl(legN)
+                            string lblStyle = (seq.isBull ? (legN % 2 == 0) : (legN % 2 == 1)) ? label.style_label_up : label.style_label_down
+                            color txtColor = seq.isBull ? color.blue : color.red
+                            label lb = label.new(bx2, px2, ltxt, style=lblStyle, textcolor=txtColor, color=color.new(color.white, 88), size=size.small)
+                            array.push(histLabels, lb)
+                            
+                // Draw failed segment
+                if seq.failed and show_failed_motive
+                    int failedSegIdx = seq.failWave - 1
+                    float px1 = array.get(pVals, failedSegIdx)
+                    float px2 = array.get(pVals, failedSegIdx+1)
+                    int   bx1 = array.get(bVals, failedSegIdx)
+                    int   bx2 = array.get(bVals, failedSegIdx+1)
+                    
+                    line ln = line.new(bx1, px1, bx2, px2, xloc=xloc.bar_index, extend=extend.none, color=color.red, style=line.style_dotted, width=2)
+                    array.push(histLines, ln)
+                    
+                    string failTxt = "X" + str.tostring(seq.failWave)
+                    string lblStyle = (seq.isBull ? (seq.failWave % 2 == 0) : (seq.failWave % 2 == 1)) ? label.style_label_up : label.style_label_down
+                    label lb = label.new(bx2, px2, failTxt, style=lblStyle, textcolor=color.red, color=color.new(color.white, 88), size=size.small)
+                    array.push(histLabels, lb)
+                    
+                lastDrawnAnchorB0 := seq.b0
+                
+        if seq.confirmedLegs > 1
+            i := i + seq.confirmedLegs
+        else
+            i := i + 1
+
+    // ABC historical draw (once per frozen motive)
+    if show_abc and abcConfirmed and abcMotB0 != abcDrawnAtB0
+        float[] abcDrawArr = abcMotCoarse ? cPrice : fPrice
+        int[]   abcDrawBar = abcMotCoarse ? cBar   : fBar
+        int szABC = array.size(abcDrawArr)
+        if abcMotIdx >= 0 and szABC >= abcMotIdx + 9
+            abcDrawnAtB0 := abcMotB0
+            for seg = 0 to 2
+                float ax1  = array.get(abcDrawArr, abcMotIdx+5+seg)
+                float ax2  = array.get(abcDrawArr, abcMotIdx+5+seg+1)
+                int   abx1 = array.get(abcDrawBar,  abcMotIdx+5+seg)
+                int   abx2 = array.get(abcDrawBar,  abcMotIdx+5+seg+1)
+                line aln = line.new(abx1,ax1,abx2,ax2,
+                               xloc=xloc.bar_index, extend=extend.none,
+                               color=color.new(color.orange,0),
+                               style=line.style_solid, width=2)
+                array.push(histLines, aln)
+                
+                string abc_t = ""
+                if seg == 0
+                    abc_t := "(a)"
+                else if seg == 1
+                    abc_t := "(b)"
+                else
+                    abc_t := "(c)"
+                    
+                bool aLow = false
+                if abcMotBull
+                    aLow := (seg % 2 == 1)
+                else
+                    aLow := (seg % 2 == 0)
+
+                string aStyle = ""
+                if aLow
+                    aStyle := label.style_label_up
+                else
+                    aStyle := label.style_label_down
+
+                label alb = label.new(abx2,ax2,abc_t,
+                               style     = aStyle,
+                               textcolor = color.new(color.orange,0),
+                               color     = color.new(color.white,88), size=size.small)
+                array.push(histLabels, alb)
+
+// ── 7B: Live drawing (last bar only) ─────────────────────────────
+if barstate.islast
+    for ln in liveLines
+        line.delete(ln)
+    array.clear(liveLines)
+    for lb in liveLabels
+        label.delete(lb)
+    array.clear(liveLabels)
+    if not na(formingLine)
+        line.delete(formingLine)
+        formingLine := na
+    if not na(formingLabel)
+        label.delete(formingLabel)
+        formingLabel := na
+
+    if show_wave and not structuralBreak
+        // Find and draw forming/unfinished sequences live
+        int i = 0
+        int sz = array.size(activeArr)
+        bool hasForming = false
+        
+        while i < sz - 1
+            if sz - i < 2
+                break
+            WaveSequence seq = f_trace_sequence(activeArr, activeBar, activeIsLow, activeEwo, i)
+            
+            // Check if this sequence has not been drawn historically yet
+            if seq.b0 > lastDrawnAnchorB0
+                bool isFinished = seq.confirmedLegs == 5 or seq.failed
+                
+                if isFinished
+                    // Draw completed/failed sequence completely in liveLines/liveLabels
+                    int drawLegs = seq.failed ? (seq.failWave - 1) : 5
+                    float[] pVals = array.from(seq.p0, seq.p1, seq.p2, seq.p3, seq.p4, seq.p5)
+                    int[]   bVals = array.from(seq.b0, seq.b1, seq.b2, seq.b3, seq.b4, seq.b5)
+                    
+                    if drawLegs > 0
+                        for seg = 0 to drawLegs - 1
+                            float px1 = array.get(pVals, seg)
+                            float px2 = array.get(pVals, seg+1)
+                            int   bx1 = array.get(bVals, seg)
+                            int   bx2 = array.get(bVals, seg+1)
+                            int   legN = seg + 1
+                            
+                            color segCol = seq.isBull ? color.blue : color.red
+                            line ln = line.new(bx1, px1, bx2, px2, xloc=xloc.bar_index, extend=extend.none, color=segCol, style=line.style_solid, width=2)
+                            array.push(liveLines, ln)
+                            
+                            if show_partial_labels or legN == 5
+                                string ltxt = f_lbl(legN)
+                                string lblStyle = (seq.isBull ? (legN % 2 == 0) : (legN % 2 == 1)) ? label.style_label_up : label.style_label_down
+                                color txtColor = seq.isBull ? color.blue : color.red
+                                label lb = label.new(bx2, px2, ltxt, style=lblStyle, textcolor=txtColor, color=color.new(color.white, 88), size=size.small)
+                                array.push(liveLabels, lb)
+                                
+                    if seq.failed and show_failed_motive
+                        int failedSegIdx = seq.failWave - 1
+                        float px1 = array.get(pVals, failedSegIdx)
+                        float px2 = array.get(pVals, failedSegIdx+1)
+                        int   bx1 = array.get(bVals, failedSegIdx)
+                        int   bx2 = array.get(bVals, failedSegIdx+1)
+                        
+                        line ln = line.new(bx1, px1, bx2, px2, xloc=xloc.bar_index, extend=extend.none, color=color.red, style=line.style_dotted, width=2)
+                        array.push(liveLines, ln)
+                        
+                        string failTxt = "X" + str.tostring(seq.failWave)
+                        string lblStyle = (seq.isBull ? (seq.failWave % 2 == 0) : (seq.failWave % 2 == 1)) ? label.style_label_up : label.style_label_down
+                        label lb = label.new(bx2, px2, failTxt, style=lblStyle, textcolor=color.red, color=color.new(color.white, 88), size=size.small)
+                        array.push(liveLabels, lb)
+                else
+                    hasForming := true
+                    // It is still forming. Draw its confirmed legs.
+                    int drawLegs = seq.confirmedLegs
+                    float[] pVals = array.from(seq.p0, seq.p1, seq.p2, seq.p3, seq.p4, seq.p5)
+                    int[]   bVals = array.from(seq.b0, seq.b1, seq.b2, seq.b3, seq.b4, seq.b5)
+                    
+                    if drawLegs > 0
+                        for seg = 0 to drawLegs - 1
+                            float px1 = array.get(pVals, seg)
+                            float px2 = array.get(pVals, seg+1)
+                            int   bx1 = array.get(bVals, seg)
+                            int   bx2 = array.get(bVals, seg+1)
+                            int   legN = seg + 1
+                            
+                            color segCol = seq.isBull ? color.blue : color.red
+                            line ln = line.new(bx1, px1, bx2, px2, xloc=xloc.bar_index, extend=extend.none, color=segCol, style=line.style_solid, width=2)
+                            array.push(liveLines, ln)
+                            
+                            if show_partial_labels
+                                string ltxt = f_lbl(legN)
+                                string lblStyle = (seq.isBull ? (legN % 2 == 0) : (legN % 2 == 1)) ? label.style_label_up : label.style_label_down
+                                color txtColor = seq.isBull ? color.blue : color.red
+                                label lb = label.new(bx2, px2, ltxt, style=lblStyle, textcolor=txtColor, color=color.new(color.white, 88), size=size.small)
+                                array.push(liveLabels, lb)
+                                
+                    // Draw the forming leg.
+                    if show_forming_motive
+                        int   lastB = array.get(bVals, drawLegs)
+                        float lastP = array.get(pVals, drawLegs)
+                        int   nextLegN = drawLegs + 1
+                        
+                        // Check for live failure at current close
+                        int liveFail = 0
+                        if nextLegN == 2
+                            bool fail = seq.isBull ? (close < seq.p0) : (close > seq.p0)
+                            if fail
+                                liveFail := 2
+                        else if nextLegN == 3
+                            bool fail = seq.isBull ? (close < seq.p2) : (close > seq.p2)
+                            if fail
+                                liveFail := 3
+                        else if nextLegN == 4
+                            bool fail = seq.isBull ? (close <= seq.p1) : (close >= seq.p1)
+                            if fail
+                                liveFail := 4
+                        else if nextLegN == 5
+                            bool fail = seq.isBull ? (close < seq.p4 or close < seq.p0) : (close > seq.p4 or close > seq.p0)
+                            if fail
+                                liveFail := 5
+                                
+                        color formingCol = liveFail > 0 ? color.red : color.gray
+                        formingLine := line.new(lastB, lastP, bar_index, close, xloc=xloc.bar_index, extend=extend.none, color=formingCol, style=line.style_dotted, width=2)
+                        
+                        string labelTxt = ""
+                        color labelCol = na
+                        if liveFail > 0
+                            labelTxt := "X" + str.tostring(liveFail)
+                            labelCol := color.red
+                        else
+                            labelTxt := "(" + str.tostring(nextLegN) + "?)"
+                            labelCol := color.gray
+                            
+                        string lblStyle = (seq.isBull ? (nextLegN % 2 == 0) : (nextLegN % 2 == 1)) ? label.style_label_up : label.style_label_down
+                        formingLabel := label.new(bar_index, close, labelTxt, style=lblStyle, textcolor=labelCol, color=color.new(color.white, 88), size=size.small)
+                        
+                        string statusTxt = liveFail > 0 ? ("EW FAIL X" + str.tostring(liveFail)) : ("EW " + str.tostring(nextLegN) + "/5")
+                        f_update_status_label(statusTxt)
+                    else
+                        string statusTxt = "EW " + str.tostring(drawLegs) + "/5"
+                        f_update_status_label(statusTxt)
+            
+            // Advance index
+            if seq.confirmedLegs > 1
+                i := i + seq.confirmedLegs
+            else
+                i := i + 1
+                
+        if not hasForming and sz >= 6
+            WaveSequence lastSeq = f_trace_sequence(activeArr, activeBar, activeIsLow, activeEwo, sz - 6)
+            if lastSeq.failed
+                f_update_status_label("EW FAIL X" + str.tostring(lastSeq.failWave))
+            else if lastSeq.confirmedLegs == 5
+                f_update_status_label("EW COMPLETE")
+            else
+                f_update_status_label("EW NONE")
+        else if not hasForming
+            f_update_status_label("EW NONE")
+
+// ═════════════════════════════════════════════════════════════════════
+// Stage 7c: Signal Labels and Alerts
+// ═════════════════════════════════════════════════════════════════════
+if show_abc_sig and abcConfirmLbl and barstate.isconfirmed
+    float yLocAbc = abcMotBull ? low : high
+    string stAbc = abcMotBull ? label.style_label_up : label.style_label_down
+    string abcTxt = abc_mode == "Both" ? "ABC+" : (abc_mode == "LuxAlgo" ? "ABC L" : "ABC")
+    label.new(bar_index, yLocAbc, abcTxt, style=stAbc, color=color.new(color.orange, 0), textcolor=color.white, size=size.small)
+
+bool anyPivotABC = not na(plF) or not na(phF) or not na(plC) or not na(phC)
+if show_abc_forming and abcForming and not abcConfirmed and anyPivotABC and barstate.isconfirmed
+    float yF = abcMotBull ? low : high
+    string stF = abcMotBull ? label.style_label_up : label.style_label_down
+    label.new(bar_index, yF, "ABC? " + str.tostring(abcFormLegs + 1) + "/3", style=stF, color=color.new(color.orange, 60), textcolor=color.white, size=size.tiny)
+
+if show_sig and barstate.isconfirmed
+    if tier1LongLbl
+        label.new(bar_index,low,"T1",style=label.style_label_up,color=color.new(color.purple,0),textcolor=color.white,size=size.tiny)
+    if tier2Long
+        label.new(bar_index,low,"T2 L",style=label.style_label_up,color=color.new(color.green,0),textcolor=color.white,size=size.small)
+    if tier3Long
+        label.new(bar_index,low,"W3 L",style=label.style_label_up,color=color.new(color.lime,0),textcolor=color.black,size=size.normal)
+    if w5WarnLong
+        label.new(bar_index,low,"W5 !",style=label.style_label_up,color=color.new(color.yellow,0),textcolor=color.black,size=size.small)
+    if tier1ShortLbl
+        label.new(bar_index,high,"T1",style=label.style_label_down,color=color.new(color.purple,0),textcolor=color.white,size=size.tiny)
+    if tier2Short
+        label.new(bar_index,high,"T2 S",style=label.style_label_down,color=color.new(color.red,0),textcolor=color.white,size=size.small)
+    if tier3Short
+        label.new(bar_index,high,"W3 S",style=label.style_label_down,color=color.new(color.red,0),textcolor=color.white,size=size.normal)
+    if w5WarnShort
+        label.new(bar_index,high,"W5 !",style=label.style_label_down,color=color.new(color.yellow,0),textcolor=color.black,size=size.small)
+
+float posVal = show_sig ? posPct : na
+plotchar(posVal, title="AEWO Position %", char="*", location=location.top, color=color.new(color.white,0), size=size.tiny)

@@ -1,0 +1,220 @@
+.wave-scanner-panel {
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.scanner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 1rem;
+}
+
+.scanner-header h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.scanner-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.active-badge {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: var(--success-color);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background-color: var(--success-color);
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulse 1.6s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.scanner-table-container {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(10, 14, 23, 0.3);
+}
+
+.scanner-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.scanner-table th {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.scanner-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.scanner-row {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.scanner-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.row-selected {
+  background: rgba(59, 130, 246, 0.06) !important;
+  border-left: 3px solid var(--accent-color);
+}
+
+.cell-symbol {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.cell-price {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.badge-signal {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.badge-t1 {
+  background: rgba(192, 132, 252, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(192, 132, 252, 0.2);
+}
+
+.badge-t2 {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success-color);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.badge-t3 {
+  background: rgba(4, 120, 87, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(4, 120, 87, 0.2);
+}
+
+.badge-sell {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger-color);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.badge-neutral {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.confidence-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.confidence-text {
+  font-weight: 600;
+  font-size: 0.85rem;
+  width: 35px;
+}
+
+.progress-bar-bg {
+  width: 80px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+.fill-t1 {
+  background-color: #c084fc;
+}
+
+.fill-t2 {
+  background-color: var(--success-color);
+}
+
+.fill-t3 {
+  background-color: #34d399;
+}
+
+.fill-sell {
+  background-color: var(--danger-color);
+}
+
+.neutral-text {
+  color: var(--text-secondary);
+}
+
+.cell-label-badge {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.text-warn {
+  color: #ff9800;
+  font-weight: 600;
+}
+
+.text-up {
+  color: var(--success-color);
+}
+
+.text-down {
+  color: var(--danger-color);
+}

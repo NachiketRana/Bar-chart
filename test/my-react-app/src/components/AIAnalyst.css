@@ -1,0 +1,313 @@
+/* AIAnalyst.css */
+
+.ai-analyst-container {
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+  margin-bottom: 2rem;
+  border: 1px solid rgba(139, 92, 246, 0.15) !important; /* purple tint to denote AI */
+  background: linear-gradient(135deg, rgba(17, 24, 39, 0.8), rgba(26, 21, 44, 0.7)) !important;
+  box-shadow: 0 8px 32px 0 rgba(139, 92, 246, 0.08) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Background grid styling for premium AI look */
+.ai-analyst-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 20px 20px;
+  pointer-events: none;
+}
+
+.analyst-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 1rem;
+  position: relative;
+  z-index: 1;
+}
+
+.title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.bot-avatar {
+  background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+  padding: 0.75rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
+  position: relative;
+}
+
+.brain-icon {
+  color: #ffffff;
+  width: 22px;
+  height: 22px;
+}
+
+.sparkles-decor {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  color: #fbbf24;
+  width: 14px;
+  height: 14px;
+  animation: float 2.5s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-4px) scale(1.15); }
+  100% { transform: translateY(0px) scale(1); }
+}
+
+.title-section h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.2rem;
+  letter-spacing: -0.01em;
+}
+
+.analyst-status {
+  font-size: 0.8rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.typing-indicator-text {
+  color: #a78bfa;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ready-indicator-text {
+  color: #34d399;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pulse-dot-ai {
+  width: 6px;
+  height: 6px;
+  background-color: #a78bfa;
+  border-radius: 50%;
+  animation: pulse-ai 1.2s infinite;
+}
+
+@keyframes pulse-ai {
+  0% { transform: scale(0.9); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.5; }
+}
+
+.ready-icon {
+  color: #34d399;
+}
+
+.analyst-actions {
+  position: relative;
+  z-index: 1;
+}
+
+.action-btn-ai {
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: #c084fc;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.action-btn-ai:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+}
+
+.action-btn-ai:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Metrics grid */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.metric-card-ai {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  transition: transform 0.25s ease, background-color 0.25s ease;
+}
+
+.metric-card-ai:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.m-icon {
+  color: #94a3b8;
+}
+
+.m-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.m-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.15rem;
+}
+
+.m-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Setup signal colors */
+.signal-neutral { color: var(--text-secondary); }
+.signal-t1_pre { color: #c084fc; text-shadow: 0 0 8px rgba(192, 132, 252, 0.2); }
+.signal-t2_cross { color: #34d399; text-shadow: 0 0 8px rgba(52, 211, 153, 0.2); }
+.signal-t3_confirm { color: #3b82f6; text-shadow: 0 0 8px rgba(59, 130, 246, 0.25); }
+.signal-w5_exhaustion { color: #f87171; text-shadow: 0 0 8px rgba(248, 113, 113, 0.25); }
+
+/* Report Content Panel */
+.report-content-panel {
+  background: rgba(10, 14, 23, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 1.25rem;
+  position: relative;
+  z-index: 1;
+}
+
+.text-scroll-area {
+  max-height: 400px;
+  overflow-y: auto;
+  font-size: 0.925rem;
+  line-height: 1.6;
+  color: #cbd5e1;
+  padding-right: 0.5rem;
+}
+
+/* Custom styled markdown layout inside typewriter output */
+.analyst-p {
+  margin-bottom: 0.75rem;
+  color: #cbd5e1;
+}
+
+.analyst-divider {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin: 1.25rem 0;
+}
+
+.analyst-h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-left: 3px solid #8b5cf6;
+  padding-left: 8px;
+}
+
+.analyst-bullet {
+  margin-left: 1.25rem;
+  margin-bottom: 0.5rem;
+  list-style-type: square;
+}
+
+.analyst-bullet::marker {
+  color: #8b5cf6;
+}
+
+.code-badge {
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: #d8b4fe;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.typewriter-cursor {
+  font-weight: bold;
+  color: #a78bfa;
+  animation: blink 0.8s step-end infinite;
+  display: inline-block;
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  from, to { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@media (max-width: 600px) {
+  .analyst-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .analyst-actions {
+    width: 100%;
+  }
+  
+  .action-btn-ai {
+    width: 100%;
+    justify-content: center;
+  }
+}

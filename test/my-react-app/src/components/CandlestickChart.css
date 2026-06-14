@@ -1,0 +1,86 @@
+.chart-panel {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.chart-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.symbol-badge-large {
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 0.3rem 0.8rem;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #388bfd22, #388bfd44);
+  border: 1px solid #388bfd55;
+  color: #58a6ff;
+  letter-spacing: 0.05em;
+}
+
+.chart-label {
+  font-size: 0.9rem;
+  color: #8b949e;
+  font-weight: 500;
+}
+
+/* OHLCV Tooltip Bar */
+.ohlcv-tooltip {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  flex-wrap: wrap;
+}
+
+.ohlcv-tooltip.bullish {
+  border-color: #26a64133;
+}
+
+.ohlcv-tooltip.bearish {
+  border-color: #f8514933;
+}
+
+.tooltip-time {
+  color: #8b949e;
+  font-size: 0.75rem;
+}
+
+.text-up {
+  color: #26a641;
+}
+
+.text-down {
+  color: #f85149;
+}
+
+.tooltip-hint {
+  font-size: 0.78rem;
+  color: #484f58;
+  font-style: italic;
+}
+
+/* Chart container */
+.chart-container {
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
