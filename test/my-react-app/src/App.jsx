@@ -43,7 +43,8 @@ function App() {
         // Fetch data for all available symbols concurrently
         await Promise.all(
           availableSymbols.map(async (sym) => {
-            let url = `http://localhost:5000/api/stocks/${sym}?interval=${intervalState}`;
+            const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            let url = `${apiBaseUrl}/api/stocks/${sym}?interval=${intervalState}`;
             if (historyLimit !== 'max') {
               url += `&limitYears=${historyLimit}`;
             }

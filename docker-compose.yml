@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # =========================================================================
+  # 1. PostgreSQL Database Service
+  # =========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: pern_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-${DB_USER:-postgres}}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-${DB_PASSWORD:-8761}}
+      POSTGRES_DB: ${POSTGRES_DB:-${DB_NAME:-postgres}}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-${DB_USER:-postgres}} -d ${POSTGRES_DB:-${DB_NAME:-postgres}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pern_network
+
+  # =========================================================================
+  # 2. Node.js Express Backend API Service
+  # =========================================================================
+  backend:
+    build:
+      context: ./test/my-node-project # (Change to ./server if organized as client/server)
+      dockerfile: Dockerfile
+    container_name: pern_backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-${DB_USER:-postgres}}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-${DB_PASSWORD:-8761}}
+      DB_NAME: ${POSTGRES_DB:-${DB_NAME:-postgres}}
+      DATABASE_URL: postgres://${POSTGRES_USER:-${DB_USER:-postgres}}:${POSTGRES_PASSWORD:-${DB_PASSWORD:-8761}}@postgres:5432/${POSTGRES_DB:-${DB_NAME:-postgres}}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pern_network
+
+  # =========================================================================
+  # 3. React / Vite Frontend Service
+  # =========================================================================
+  frontend:
+    build:
+      context: ./test/my-react-app # (Change to ./client if organized as client/server)
+      dockerfile: Dockerfile
+    container_name: pern_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:5000}
+    depends_on:
+      - backend
+    networks:
+      - pern_network
+
+# =========================================================================
+# Volumes & Networks
+# =========================================================================
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  pern_network:
+    driver: bridge
